@@ -1,0 +1,40 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Base branch to check if a branch has been merged.
+base_branch=origin/master
+# Log file to put the output of all git commands in.
+log_file=.list-branches-log
+
+# List all references and strip off `refs/heads/`.
+for branch in $(git for-each-ref --format='%(refname)' refs/heads/ | sed "s#^refs/heads/##"); do
+    # git cherry prints out a line for each commit from the merge base of the
+    # base branch and the specified branch and a + indicates that a commit was
+    # _not_ found on the base branch.
+    if git cherry "$base_branch" "$branch" | grep --silent '^+'; then
+        # There is at least one commit not represented on the base branch so
+        # we need to squash all commits on this branch and check if _that_ is
+        # represented on the base branch.
+
+        # Check out the merge base in detached head mode.
+        git checkout "$(git merge-base "$base_branch" "$branch")" >> "$log_file" 2>&1
+
+        # Squash the branch into the staging index.
+        git merge --squash "$branch" >> "$log_file" 2>&1
+
+        # Commit the result and skip verification because we only care about
+        # the patch.
+        git commit --no-verify --no-edit >> "$log_file" 2>&1
+
+        # Now run git cherry again to check if the squashed branch is on the
+        # base branch.
+        if git cherry "$base_branch" HEAD | grep --silent '^+'; then
+            echo "Unmerged: $branch"
+        else
+            echo "Merged: $branch"
+        fi
+    else
+        echo "Merged: $branch"
+    fi
+done
