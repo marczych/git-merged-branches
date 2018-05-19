@@ -17,15 +17,17 @@ for branch in $(git for-each-ref --format='%(refname)' refs/heads/ | sed "s#^ref
         # we need to squash all commits on this branch and check if _that_ is
         # represented on the base branch.
 
-        # Check out the merge base in detached head mode.
-        git checkout "$(git merge-base "$base_branch" "$branch")" >> "$log_file" 2>&1
+        (
+            # Check out the merge base in detached head mode.
+            git checkout "$(git merge-base "$base_branch" "$branch")"
 
-        # Squash the branch into the staging index.
-        git merge --squash "$branch" >> "$log_file" 2>&1
+            # Squash the branch into the staging index.
+            git merge --squash "$branch"
 
-        # Commit the result and skip verification because we only care about
-        # the patch.
-        git commit --no-verify --no-edit >> "$log_file" 2>&1
+            # Commit the result and skip verification because we only care about
+            # the patch.
+            git commit --no-verify --no-edit
+        ) >> "$log_file" 2>&1
 
         # Now run git cherry again to check if the squashed branch is on the
         # base branch.
